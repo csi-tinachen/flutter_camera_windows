@@ -87,6 +87,7 @@ class CaptureController {
   // resolution_preset: Maximum capture resolution height.
   virtual bool InitCaptureDevice(TextureRegistrar* texture_registrar,
                                  const std::string& device_id,
+                                 const std::string& frame_format,
                                  bool record_audio,
                                  ResolutionPreset resolution_preset) = 0;
 
