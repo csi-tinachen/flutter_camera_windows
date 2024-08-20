@@ -68,6 +68,7 @@ class CameraWindows extends CameraPlatform {
     CameraDescription cameraDescription,
     ResolutionPreset? resolutionPreset, {
     bool enableAudio = false,
+    String frameFormat = "",
   }) async {
     try {
       // If resolutionPreset is not specified, plugin selects the highest resolution possible.
@@ -76,6 +77,7 @@ class CameraWindows extends CameraPlatform {
         'cameraName': cameraDescription.name,
         'resolutionPreset': _serializeResolutionPreset(resolutionPreset),
         'enableAudio': enableAudio,
+        'frameFormat': frameFormat,
       });
 
       if (reply == null) {

@@ -242,6 +242,7 @@ class CaptureControllerImpl : public CaptureController,
   std::unique_ptr<TextureHandler> texture_handler_;
   CaptureControllerListener* capture_controller_listener_;
 
+  std::string preview_frame_format_;
   std::string video_device_id_;
   CaptureEngineState capture_engine_state_ =
       CaptureEngineState::kNotInitialized;

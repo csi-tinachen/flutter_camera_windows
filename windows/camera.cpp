@@ -49,25 +49,28 @@ CameraImpl::~CameraImpl() {
 
 bool CameraImpl::InitCamera(flutter::TextureRegistrar* texture_registrar,
                             flutter::BinaryMessenger* messenger,
+                            const std::string& frame_format,
                             bool record_audio,
                             ResolutionPreset resolution_preset) {
   auto capture_controller_factory =
       std::make_unique<CaptureControllerFactoryImpl>();
   return InitCamera(std::move(capture_controller_factory), texture_registrar,
-                    messenger, record_audio, resolution_preset);
+                    messenger, frame_format, record_audio, resolution_preset);
 }
 
 bool CameraImpl::InitCamera(
     std::unique_ptr<CaptureControllerFactory> capture_controller_factory,
     flutter::TextureRegistrar* texture_registrar,
-    flutter::BinaryMessenger* messenger, bool record_audio,
+    flutter::BinaryMessenger* messenger,
+    const std::string& frame_format,
+    bool record_audio,
     ResolutionPreset resolution_preset) {
   assert(!device_id_.empty());
   messenger_ = messenger;
   capture_controller_ =
       capture_controller_factory->CreateCaptureController(this);
   return capture_controller_->InitCaptureDevice(
-      texture_registrar, device_id_, record_audio, resolution_preset);
+      texture_registrar, device_id_, frame_format, record_audio, resolution_preset);
 }
 
 bool CameraImpl::AddPendingResult(

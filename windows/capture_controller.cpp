@@ -300,7 +300,7 @@ void CaptureControllerImpl::ResetCaptureController() {
 }
 
 bool CaptureControllerImpl::InitCaptureDevice(
-    flutter::TextureRegistrar* texture_registrar, const std::string& device_id,
+    flutter::TextureRegistrar* texture_registrar, const std::string& device_id, const std::string& frame_format,
     bool record_audio, ResolutionPreset resolution_preset) {
   assert(capture_controller_listener_);
 
@@ -319,6 +319,7 @@ bool CaptureControllerImpl::InitCaptureDevice(
   record_audio_ = record_audio;
   texture_registrar_ = texture_registrar;
   video_device_id_ = device_id;
+  preview_frame_format_ = frame_format;
 
   // MFStartup must be called before using Media Foundation.
   if (!media_foundation_started_) {

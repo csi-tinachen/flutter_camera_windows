@@ -45,6 +45,7 @@ constexpr char kDisposeMethod[] = "dispose";
 constexpr char kCameraNameKey[] = "cameraName";
 constexpr char kResolutionPresetKey[] = "resolutionPreset";
 constexpr char kEnableAudioKey[] = "enableAudio";
+constexpr char kFrameFormatKey[] = "frameFormat";
 
 constexpr char kCameraIdKey[] = "cameraId";
 constexpr char kMaxVideoDurationKey[] = "maxVideoDuration";
@@ -357,6 +358,14 @@ void CameraPlugin::CreateMethodHandler(
                          std::string(kEnableAudioKey) + " argument missing");
   }
 
+  // Parse frameFormat argument.
+  const auto* frame_format =
+      std::get_if<std::string>(ValueOrNull(args, kFrameFormatKey));
+  if (!frame_format) {
+    return result->Error("argument_error",
+                         std::string(kFrameFormatKey) + " argument missing");
+  }
+
   // Parse cameraName argument.
   const auto* camera_name =
       std::get_if<std::string>(ValueOrNull(args, kCameraNameKey));
@@ -398,7 +407,7 @@ void CameraPlugin::CreateMethodHandler(
       resolution_preset = ResolutionPreset::kAuto;
     }
 
-    bool initialized = camera->InitCamera(texture_registrar_, messenger_,
+    bool initialized = camera->InitCamera(texture_registrar_, messenger_, *frame_format,
                                           *record_audio, resolution_preset);
     if (initialized) {
       cameras_.push_back(std::move(camera));
