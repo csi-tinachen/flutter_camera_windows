@@ -606,6 +606,7 @@ void CaptureControllerImpl::StartPreview() {
 
   texture_handler_->UpdateTextureSize(preview_frame_width_,
                                       preview_frame_height_);
+  texture_handler_->SetFrameFormat(preview_frame_format_);
 
   // TODO(loic-sharma): This does not handle duplicate calls properly.
   // See: https://github.com/flutter/flutter/issues/108404

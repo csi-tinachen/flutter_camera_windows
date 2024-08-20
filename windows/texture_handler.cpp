@@ -102,17 +102,35 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
           // but if enabled, samples will not be processed.
 
           // Calculates mirrored pixel position.
-          uint32_t tp =
-              (y * preview_frame_width_) + ((preview_frame_width_ - 1) - x);
-          dst[tp].r = src[sp].r;
-          dst[tp].g = src[sp].g;
-          dst[tp].b = src[sp].b;
-          dst[tp].a = 255;
+          // Check the frame format
+          if (frame_foramt_.compare(FRAME_FORMAT_YUV) == 0) {
+            uint32_t tp =
+                (y * preview_frame_width_) + ((preview_frame_width_ - 1) - x);
+            dst[tp].r = src[sp].r;
+            dst[tp].g = src[sp].g;
+            dst[tp].b = src[sp].b;
+            dst[tp].a = 255;
+          } else if (frame_foramt_.compare(FRAME_FORMAT_RGB) == 0) {
+            uint32_t tp =
+                (y * preview_frame_width_) + ((preview_frame_width_ - 1) - x);
+            dst[tp].r = src[sp].r;
+            dst[tp].g = src[sp].r;
+            dst[tp].b = src[sp].r;
+            dst[tp].a = 255;
+          }
         } else {
-          dst[sp].r = src[sp].r;
-          dst[sp].g = src[sp].g;
-          dst[sp].b = src[sp].b;
-          dst[sp].a = 255;
+          // Check the frame format
+          if (frame_foramt_.compare(FRAME_FORMAT_YUV) == 0) {
+            dst[sp].r = src[sp].r;
+            dst[sp].g = src[sp].g;
+            dst[sp].b = src[sp].b;
+            dst[sp].a = 255;
+          } else if (frame_foramt_.compare(FRAME_FORMAT_RGB) == 0) {
+            dst[sp].r = src[sp].b;
+            dst[sp].g = src[sp].b;
+            dst[sp].b = src[sp].b;
+            dst[sp].a = 255;
+          }
         }
       }
     }
