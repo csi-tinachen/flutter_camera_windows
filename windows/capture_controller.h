@@ -137,7 +137,7 @@ class CaptureControllerImpl : public CaptureController,
 
   // CaptureController
   bool InitCaptureDevice(TextureRegistrar* texture_registrar,
-                         const std::string& device_id, bool record_audio,
+                         const std::string& device_id, const std::string& frame_format, bool record_audio,
                          ResolutionPreset resolution_preset) override;
   uint32_t GetPreviewWidth() const override { return preview_frame_width_; }
   uint32_t GetPreviewHeight() const override { return preview_frame_height_; }
