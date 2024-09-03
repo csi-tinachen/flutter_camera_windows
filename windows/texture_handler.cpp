@@ -163,7 +163,7 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
     flutter_desktop_pixel_buffer_->width = preview_frame_width_;
     flutter_desktop_pixel_buffer_->height = preview_frame_height_;
     if (capture_controller_listener_) {
-      capture_controller_listener_->OnStreamedFrameAvailable(raw.data(), preview_frame_width_ * preview_frame_height_ * 4);
+      capture_controller_listener_->OnStreamedFrameAvailable(raw_buffer_.data(), preview_frame_width_ * preview_frame_height_ * 4);
     }
     // Releases unique_lock and set mutex pointer for release context.
     flutter_desktop_pixel_buffer_->release_context = buffer_lock.release();
