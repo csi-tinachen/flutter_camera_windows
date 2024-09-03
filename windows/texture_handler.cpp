@@ -86,12 +86,17 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
     if (dest_buffer_.size() != data_size) {
       dest_buffer_.resize(data_size);
     }
+    if (raw_buffer_.size() != data_size) {
+      raw_buffer_.resize(data_size);
+    }
 
     // Map buffers to structs for easier conversion.
     MFVideoFormatRGB32Pixel* src =
         reinterpret_cast<MFVideoFormatRGB32Pixel*>(source_buffer_.data());
     FlutterDesktopPixel* dst =
         reinterpret_cast<FlutterDesktopPixel*>(dest_buffer_.data());
+    FlutterDesktopPixel* raw =
+        reinterpret_cast<FlutterDesktopPixel*>(raw_buffer_.data());
 
     for (uint32_t y = 0; y < preview_frame_height_; y++) {
       for (uint32_t x = 0; x < preview_frame_width_; x++) {
@@ -103,23 +108,30 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
 
           // Calculates mirrored pixel position.
           // Check the frame format
+          uint32_t tp =
+              (y * preview_frame_width_) + ((preview_frame_width_ - 1) - x);
+          raw[tp].r = src[sp].r;
+          raw[tp].g = src[sp].g;
+          raw[tp].b = src[sp].b;
+          raw[tp].a = 255;
+
           if (frame_foramt_.compare(FRAME_FORMAT_YUV) == 0) {
-            uint32_t tp =
-                (y * preview_frame_width_) + ((preview_frame_width_ - 1) - x);
             dst[tp].r = src[sp].r;
             dst[tp].g = src[sp].g;
             dst[tp].b = src[sp].b;
             dst[tp].a = 255;
           } else if (frame_foramt_.compare(FRAME_FORMAT_RGB) == 0) {
-            uint32_t tp =
-                (y * preview_frame_width_) + ((preview_frame_width_ - 1) - x);
-            dst[tp].r = src[sp].r;
-            dst[tp].g = src[sp].r;
-            dst[tp].b = src[sp].r;
+            dst[tp].r = src[sp].b;
+            dst[tp].g = src[sp].b;
+            dst[tp].b = src[sp].b;
             dst[tp].a = 255;
           }
         } else {
           // Check the frame format
+          raw[sp].r = src[sp].r;
+          raw[sp].g = src[sp].g;
+          raw[sp].b = src[sp].b;
+          raw[sp].a = 255;
           if (frame_foramt_.compare(FRAME_FORMAT_YUV) == 0) {
             dst[sp].r = src[sp].r;
             dst[sp].g = src[sp].g;
@@ -151,7 +163,7 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
     flutter_desktop_pixel_buffer_->width = preview_frame_width_;
     flutter_desktop_pixel_buffer_->height = preview_frame_height_;
     if (capture_controller_listener_) {
-      capture_controller_listener_->OnStreamedFrameAvailable(dest_buffer_.data(), preview_frame_width_ * preview_frame_height_ * 4);
+      capture_controller_listener_->OnStreamedFrameAvailable(raw.data(), preview_frame_width_ * preview_frame_height_ * 4);
     }
     // Releases unique_lock and set mutex pointer for release context.
     flutter_desktop_pixel_buffer_->release_context = buffer_lock.release();

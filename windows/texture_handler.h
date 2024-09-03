@@ -92,6 +92,7 @@ class TextureHandler {
 
   std::vector<uint8_t> source_buffer_;
   std::vector<uint8_t> dest_buffer_;
+  std::vector<uint8_t> raw_buffer_;
   std::unique_ptr<flutter::TextureVariant> texture_;
   std::unique_ptr<FlutterDesktopPixelBuffer> flutter_desktop_pixel_buffer_ =
       nullptr;
