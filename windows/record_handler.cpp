@@ -18,7 +18,8 @@ using Microsoft::WRL::ComPtr;
 // Initializes media type for video capture.
 HRESULT BuildMediaTypeForVideoCapture(IMFMediaType* src_media_type,
                                       IMFMediaType** video_record_media_type,
-                                      GUID capture_format) {
+                                      GUID capture_format,
+                                      UINT32 bitrate) {
   assert(src_media_type);
   ComPtr<IMFMediaType> new_media_type;
 
@@ -34,6 +35,12 @@ HRESULT BuildMediaTypeForVideoCapture(IMFMediaType* src_media_type,
   }
 
   hr = new_media_type->SetGUID(MF_MT_SUBTYPE, capture_format);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  // Set the video bitrate on a video media type.
+  hr = new_media_type->SetUINT32(MF_MT_AVG_BITRATE, bitrate);
   if (FAILED(hr)) {
     return hr;
   }
@@ -55,7 +62,7 @@ HRESULT GetCollectionObject(IMFCollection* pCollection, DWORD index,
 }
 
 // Initializes media type for audo capture.
-HRESULT BuildMediaTypeForAudioCapture(IMFMediaType** audio_record_media_type) {
+HRESULT BuildMediaTypeForAudioCapture(IMFMediaType** audio_record_media_type, UINT32 bitrate) {
   ComPtr<IMFAttributes> audio_output_attributes;
   ComPtr<IMFMediaType> src_media_type;
   ComPtr<IMFMediaType> new_media_type;
@@ -110,6 +117,12 @@ HRESULT BuildMediaTypeForAudioCapture(IMFMediaType** audio_record_media_type) {
     return hr;
   }
 
+  // Set the audio bitrate on an audio media type.
+  hr = new_media_type->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, bitrate);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
   new_media_type.CopyTo(audio_record_media_type);
   return hr;
 }
@@ -155,7 +168,8 @@ HRESULT RecordHandler::InitRecordSink(IMFCaptureEngine* capture_engine,
 
   hr = BuildMediaTypeForVideoCapture(base_media_type,
                                      video_record_media_type.GetAddressOf(),
-                                     MFVideoFormat_H264);
+                                     MFVideoFormat_H264,
+                                     5000000);
   if (FAILED(hr)) {
     return hr;
   }
@@ -172,7 +186,7 @@ HRESULT RecordHandler::InitRecordSink(IMFCaptureEngine* capture_engine,
     ComPtr<IMFMediaType> audio_record_media_type;
     HRESULT audio_capture_hr = S_OK;
     audio_capture_hr =
-        BuildMediaTypeForAudioCapture(audio_record_media_type.GetAddressOf());
+        BuildMediaTypeForAudioCapture(audio_record_media_type.GetAddressOf(), 128000);
 
     if (SUCCEEDED(audio_capture_hr)) {
       DWORD audio_record_sink_stream_index;
