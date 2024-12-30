@@ -48,6 +48,7 @@ constexpr char kEnableAudioKey[] = "enableAudio";
 constexpr char kFrameFormatKey[] = "frameFormat";
 
 constexpr char kCameraIdKey[] = "cameraId";
+constexpr char kPathKey[] = "path";
 constexpr char kMaxVideoDurationKey[] = "maxVideoDuration";
 
 constexpr char kResolutionPresetValueLow[] = "low";
@@ -175,17 +176,22 @@ std::optional<std::string> GetFilePathForPicture() {
 }
 
 // Builds file path for video capture.
-std::optional<std::string> GetFilePathForVideo() {
-  ComHeapPtr<wchar_t> known_folder_path;
-  HRESULT hr = SHGetKnownFolderPath(FOLDERID_Videos, KF_FLAG_CREATE, nullptr,
-                                    &known_folder_path);
-  if (FAILED(hr)) {
-    return std::nullopt;
+std::optional<std::string> GetFilePathForVideo(const std::optional<std::string>& custom_path) {
+  std::string path;
+
+  if (custom_path && !custom_path->empty()) {
+    path = *custom_path;
+  } else {
+    ComHeapPtr<wchar_t> known_folder_path;
+    HRESULT hr = SHGetKnownFolderPath(FOLDERID_Videos, KF_FLAG_CREATE, nullptr,
+                                      &known_folder_path);
+    if (FAILED(hr)) {
+      return std::nullopt;
+    }
+    path = Utf8FromUtf16(std::wstring(known_folder_path));
   }
 
-  std::string path = Utf8FromUtf16(std::wstring(known_folder_path));
-
-  return path + "\\" + "VideoCapture_" + GetCurrentTimeString() + "." +
+  return path + "\\" + "video_" + GetCurrentTimeString() + "." +
          kVideoCaptureExtension;
 }
 }  // namespace
@@ -519,7 +525,9 @@ void CameraPlugin::StartVideoRecordingMethodHandler(
     max_video_duration_ms = *requested_max_video_duration_ms;
   }
 
-  std::optional<std::string> path = GetFilePathForVideo();
+  auto custom_path = std::get_if<std::string>(ValueOrNull(args, kPathKey));
+
+  std::optional<std::string> path = GetFilePathForVideo(custom_path ? std::optional<std::string>(*custom_path) : std::nullopt);
   if (path) {
     if (camera->AddPendingResult(PendingResultType::kStartRecord,
                                  std::move(result))) {

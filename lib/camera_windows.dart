@@ -242,6 +242,16 @@ class CameraWindows extends CameraPlatform {
     );
   }
 
+  Future<void> startVideoRecordingCustom(int cameraId, String? path) async {
+    await pluginChannel.invokeMethod<void>(
+      'startVideoRecording',
+      <String, dynamic>{
+        'cameraId': cameraId,
+        'path': path,
+      },
+    );
+  }
+
   @override
   Future<XFile> stopVideoRecording(int cameraId) async {
     final String? path;
