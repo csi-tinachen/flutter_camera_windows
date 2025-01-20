@@ -11,6 +11,13 @@
 #include <mutex>
 #include <string>
 
+#include <mfapi.h>
+#include <mfidl.h>
+#include <mfobjects.h>
+#include <mferror.h>
+#include <mfreadwrite.h>
+#include <wmcodecdsp.h>
+
 #include "capture_controller_listener.h"
 
 namespace camera_windows {
@@ -46,6 +53,12 @@ class TextureHandler {
   // Updates source data buffer with given data.
   bool UpdateBuffer(uint8_t* data, uint32_t data_length);
 
+  // Video recording
+  HRESULT InitializeSinkWriter(const std::string& path, IMFSinkWriter **ppWriter, DWORD *pStreamIndex);
+  HRESULT WriteFrame(IMFSinkWriter *pWriter, DWORD streamIndex, const uint8_t* buffer, const LONGLONG& rtStart);
+  HRESULT StartRecording(const std::string& file_path);
+  HRESULT StopRecording();
+
   // Registers texture and updates given texture_id pointer value.
   int64_t RegisterTexture();
 
@@ -60,6 +73,12 @@ class TextureHandler {
 
   // Sets software mirror state.
   void SetMirrorPreviewState(bool mirror) { mirror_preview_ = mirror; }
+
+  // Set the video FPS and duration
+  void SetVideoFpsAndDuration(int64_t fps) {
+    video_fps_ = static_cast<UINT32>(fps);
+    video_frame_duration_ = static_cast<UINT64>(10 * 1000 * 1000 / fps);
+  }
 
   void SetCaptureControllerListener(
       CaptureControllerListener* capture_controller_listener) {
@@ -101,6 +120,15 @@ class TextureHandler {
   std::mutex buffer_mutex_;
 
   CaptureControllerListener* capture_controller_listener_;
+
+  // Video recording
+  bool isRecording_ = false;
+  UINT32 video_fps_ = 30;
+  UINT64 video_frame_duration_ = 10 * 1000 * 1000 / 30;  // fps=30
+  IMFSinkWriter *pSinkWriter_ = NULL;
+  DWORD stream;
+  LONGLONG rtStart = 0;    // Time stamp
+
 };
 
 }  // namespace camera_windows

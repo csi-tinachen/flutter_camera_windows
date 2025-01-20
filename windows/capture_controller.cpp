@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <iostream>
 
 #include "com_heap_ptr.h"
 #include "photo_handler.h"
@@ -560,6 +561,28 @@ void CaptureControllerImpl::StopRecord() {
   if (FAILED(hr)) {
     return OnRecordStopped(GetCameraResult(hr),
                            "Failed to stop video recording");
+  }
+}
+
+void CaptureControllerImpl::StartRecordCustom(const std::string& file_path, int64_t video_fps) {
+  assert(capture_engine_);
+  assert(texture_handler_);
+
+  texture_handler_->SetVideoFpsAndDuration(video_fps);
+  HRESULT hr = texture_handler_->StartRecording(file_path);
+  if (FAILED(hr)) {
+    std::wcerr << L"Failed to start recording: " << hr << std::endl;
+  }
+}
+
+void CaptureControllerImpl::StopRecordCustom() {
+  assert(capture_engine_);
+  assert(texture_handler_);
+
+
+  HRESULT hr = texture_handler_->StopRecording();
+  if (FAILED(hr)) {
+    std::wcerr << L"Failed to stop recording: " << hr << std::endl;
   }
 }
 

@@ -242,11 +242,12 @@ class CameraWindows extends CameraPlatform {
     );
   }
 
-  Future<void> startVideoRecordingCustom(int cameraId, String? path) async {
+  Future<void> startVideoRecordingCustom(int cameraId, int fps, String? path) async {
     await pluginChannel.invokeMethod<void>(
-      'startVideoRecording',
+      'startVideoRecordingCustom',
       <String, dynamic>{
         'cameraId': cameraId,
+        'videoFps': fps,
         'path': path,
       },
     );
@@ -262,6 +263,17 @@ class CameraWindows extends CameraPlatform {
     );
 
     return XFile(path!);
+  }
+
+  Future<String> stopVideoRecordingCustom(int cameraId) async {
+    final String? path;
+
+    path = await pluginChannel.invokeMethod<String>(
+      'stopVideoRecordingCustom',
+      <String, dynamic>{'cameraId': cameraId},
+    );
+
+    return path!;
   }
 
   @override

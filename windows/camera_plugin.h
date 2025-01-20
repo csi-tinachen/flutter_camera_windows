@@ -101,6 +101,11 @@ class CameraPlugin : public flutter::Plugin,
   // Stores result object to be handled after request is processed.
   void StopVideoRecordingMethodHandler(const EncodableMap& args,
                                        std::unique_ptr<MethodResult<>> result);
+  
+  void StartVideoRecordingCustomMethodHandler(const EncodableMap& args,
+                                        std::unique_ptr<MethodResult<>> result);
+  void StopVideoRecordingCustomMethodHandler(const EncodableMap& args,
+                                       std::unique_ptr<MethodResult<>> result);
 
   // Handles pausePreview method calls.
   // Requests existing camera controller to pause recording.
@@ -123,6 +128,8 @@ class CameraPlugin : public flutter::Plugin,
   flutter::TextureRegistrar* texture_registrar_;
   flutter::BinaryMessenger* messenger_;
   std::vector<std::unique_ptr<Camera>> cameras_;
+
+  std::optional<std::string> file_path_;
 
   friend class camera_windows::test::MockCameraPlugin;
 };

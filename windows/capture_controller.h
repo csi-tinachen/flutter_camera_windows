@@ -113,6 +113,11 @@ class CaptureController {
   // Stops the current video recording.
   virtual void StopRecord() = 0;
 
+  virtual void StartRecordCustom(const std::string& file_path,
+                           int64_t max_video_duration_ms) = 0;
+  
+  virtual void StopRecordCustom() = 0;
+
   // Captures a still photo.
   virtual void TakePicture(const std::string& file_path) = 0;
 };
@@ -148,6 +153,11 @@ class CaptureControllerImpl : public CaptureController,
                    int64_t max_video_duration_ms) override;
   void StopRecord() override;
   void TakePicture(const std::string& file_path) override;
+
+  void StartRecordCustom(const std::string& file_path,
+                   int64_t video_fps);
+
+  void StopRecordCustom();
 
   // CaptureEngineObserver
   void OnEvent(IMFMediaEvent* event) override;

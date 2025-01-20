@@ -38,6 +38,8 @@ constexpr char kInitializeMethod[] = "initialize";
 constexpr char kTakePictureMethod[] = "takePicture";
 constexpr char kStartVideoRecordingMethod[] = "startVideoRecording";
 constexpr char kStopVideoRecordingMethod[] = "stopVideoRecording";
+constexpr char kStartVideoRecordingCustomMethod[] = "startVideoRecordingCustom";
+constexpr char kStopVideoRecordingCustomMethod[] = "stopVideoRecordingCustom";
 constexpr char kPausePreview[] = "pausePreview";
 constexpr char kResumePreview[] = "resumePreview";
 constexpr char kDisposeMethod[] = "dispose";
@@ -48,6 +50,7 @@ constexpr char kEnableAudioKey[] = "enableAudio";
 constexpr char kFrameFormatKey[] = "frameFormat";
 
 constexpr char kCameraIdKey[] = "cameraId";
+constexpr char kVideoFpsKey[] = "videoFps";
 constexpr char kPathKey[] = "path";
 constexpr char kMaxVideoDurationKey[] = "maxVideoDuration";
 
@@ -266,6 +269,18 @@ void CameraPlugin::HandleMethodCall(
     assert(arguments);
 
     return StopVideoRecordingMethodHandler(*arguments, std::move(result));
+  } else if (method_name.compare(kStartVideoRecordingCustomMethod) == 0) {
+    const auto* arguments =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    assert(arguments);
+
+    return StartVideoRecordingCustomMethodHandler(*arguments, std::move(result));
+  } else if (method_name.compare(kStopVideoRecordingCustomMethod) == 0) {
+    const auto* arguments =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    assert(arguments);
+
+    return StopVideoRecordingCustomMethodHandler(*arguments, std::move(result));
   } else if (method_name.compare(kPausePreview) == 0) {
     const auto* arguments =
         std::get_if<flutter::EncodableMap>(method_call.arguments());
@@ -564,6 +579,63 @@ void CameraPlugin::StopVideoRecordingMethodHandler(
     auto cc = camera->GetCaptureController();
     assert(cc);
     cc->StopRecord();
+  }
+}
+
+void CameraPlugin::StartVideoRecordingCustomMethodHandler(
+    const EncodableMap& args, std::unique_ptr<flutter::MethodResult<>> result) {
+  auto camera_id = GetInt64ValueOrNull(args, kCameraIdKey);
+  if (!camera_id) {
+    return result->Error("argument_error",
+                         std::string(kCameraIdKey) + " missing");
+  }
+
+  auto camera = GetCameraByCameraId(*camera_id);
+  if (!camera) {
+    return result->Error("camera_error", "Camera not created");
+  }
+
+  int64_t video_fps = 30;
+  auto requested_video_fps = std::get_if<std::int32_t>(ValueOrNull(args, kVideoFpsKey));
+  if (requested_video_fps != nullptr) {
+    video_fps = *requested_video_fps;
+  }
+
+  auto custom_path = std::get_if<std::string>(ValueOrNull(args, kPathKey));
+
+  file_path_ = GetFilePathForVideo(custom_path ? std::optional<std::string>(*custom_path) : std::nullopt);
+  if (file_path_) {
+    auto cc = camera->GetCaptureController();
+    assert(cc);
+    cc->StartRecordCustom(*file_path_, video_fps);
+
+    result->Success();
+  } else {
+    result->Error("path_error", "Failed to get file path for video");
+  }
+}
+
+void CameraPlugin::StopVideoRecordingCustomMethodHandler(
+    const EncodableMap& args, std::unique_ptr<flutter::MethodResult<>> result) {
+  auto camera_id = GetInt64ValueOrNull(args, kCameraIdKey);
+  if (!camera_id) {
+    return result->Error("argument_error",
+                         std::string(kCameraIdKey) + " missing");
+  }
+
+  auto camera = GetCameraByCameraId(*camera_id);
+  if (!camera) {
+    return result->Error("camera_error", "Camera not created");
+  }
+
+  auto cc = camera->GetCaptureController();
+  assert(cc);
+  cc->StopRecordCustom();
+
+  if (file_path_.has_value()) {
+    result->Success(EncodableValue(*file_path_));
+  } else {
+    result->Error("file_path_error", "File path is not available");
   }
 }
 
