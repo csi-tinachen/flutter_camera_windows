@@ -63,6 +63,28 @@ class CameraWindows extends CameraPlatform {
     }
   }
 
+  Future<List<CameraDescription>> availableDirectShowCameras() async {
+    try {
+      final List<dynamic>? cameras = await pluginChannel.invokeMethod<List<dynamic>>('availableDirectShowCameras');
+
+      if (cameras == null) {
+        return <CameraDescription>[];
+      }
+
+      return cameras.map((dynamic item) {
+        final camera = item as Map<dynamic, dynamic>;
+        return CameraDescription(
+          name: camera['name'] as String,
+          lensDirection:
+            parseCameraLensDirection(camera['lensFacing'] as String),
+          sensorOrientation: camera['sensorOrientation'] as int,
+        );
+      }).toList();
+    } on PlatformException catch (e) {
+      throw CameraException(e.code, e.message);
+    }
+  }
+
   @override
   Future<int> createCamera(
     CameraDescription cameraDescription,

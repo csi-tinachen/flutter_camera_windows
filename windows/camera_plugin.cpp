@@ -13,7 +13,10 @@
 #include <shlobj.h>
 #include <shobjidl.h>
 #include <windows.h>
+#include <dshow.h>
 
+#include <vector>
+#include <string>
 #include <cassert>
 #include <chrono>
 #include <memory>
@@ -22,10 +25,17 @@
 #include "com_heap_ptr.h"
 #include "string_utils.h"
 
+#pragma comment(lib, "strmiids.lib")
+
 namespace camera_windows {
 using flutter::EncodableList;
 using flutter::EncodableMap;
 using flutter::EncodableValue;
+
+struct CameraInfo {
+  int index;
+  std::wstring name;
+};
 
 namespace {
 
@@ -33,6 +43,7 @@ namespace {
 constexpr char kChannelName[] = "plugins.flutter.io/camera_windows";
 
 constexpr char kAvailableCamerasMethod[] = "availableCameras";
+constexpr char kAvailableDirectShowCamerasMethod[] = "availableDirectShowCameras";
 constexpr char kCreateMethod[] = "create";
 constexpr char kInitializeMethod[] = "initialize";
 constexpr char kTakePictureMethod[] = "takePicture";
@@ -197,6 +208,71 @@ std::optional<std::string> GetFilePathForVideo(const std::optional<std::string>&
   return path + "\\" + "video_" + GetCurrentTimeString() + "." +
          kVideoCaptureExtension;
 }
+
+std::string WideStringToUtf8(const std::wstring& wstr) {
+  if (wstr.empty()) return {};
+
+  int size_needed = WideCharToMultiByte(
+      CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), NULL, 0, NULL, NULL);
+  std::string strTo(size_needed, 0);
+
+  WideCharToMultiByte(
+      CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), &strTo[0], size_needed, NULL, NULL);
+
+  return strTo;
+}
+
+std::vector<CameraInfo> ListDirectShowCameras() {
+  std::vector<CameraInfo> cameras;
+
+  ICreateDevEnum* pDevEnum = nullptr;
+  IEnumMoniker* pEnum = nullptr;
+
+  // // Cannot change thread mode after it is set.
+  // if (FAILED(CoInitializeEx(NULL, COINIT_MULTITHREADED))) {
+  //   return cameras;
+  // }
+
+  HRESULT hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL,
+                        CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pDevEnum));
+  if (FAILED(hr)) {
+    CoUninitialize();
+    return cameras;
+  }
+
+  hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pEnum, 0);
+  if (hr != S_OK) {
+    pDevEnum->Release();
+    CoUninitialize();
+    return cameras;
+  }
+
+  IMoniker* pMoniker = nullptr;
+  int index = 0;
+
+  while (pEnum->Next(1, &pMoniker, NULL) == S_OK) {
+    IPropertyBag* pPropBag;
+    hr = pMoniker->BindToStorage(0, 0, IID_PPV_ARGS(&pPropBag));
+
+    if (SUCCEEDED(hr)) {
+      VARIANT varName;
+      VariantInit(&varName);
+      hr = pPropBag->Read(L"FriendlyName", &varName, 0);
+      if (SUCCEEDED(hr)) {
+        cameras.push_back({index, varName.bstrVal});
+      }
+      VariantClear(&varName);
+      pPropBag->Release();
+    }
+    pMoniker->Release();
+    index++;
+  }
+
+  pEnum->Release();
+  pDevEnum->Release();
+  CoUninitialize();
+  return cameras;
+}
 }  // namespace
 
 // static
@@ -239,6 +315,8 @@ void CameraPlugin::HandleMethodCall(
 
   if (method_name.compare(kAvailableCamerasMethod) == 0) {
     return AvailableCamerasMethodHandler(std::move(result));
+  } else if (method_name.compare(kAvailableDirectShowCamerasMethod) == 0) {
+    return AvailableDirectShowCamerasMethodHandler(std::move(result));
   } else if (method_name.compare(kCreateMethod) == 0) {
     const auto* arguments =
         std::get_if<flutter::EncodableMap>(method_call.arguments());
@@ -361,6 +439,25 @@ void CameraPlugin::AvailableCamerasMethodHandler(
   }
 
   result->Success(std::move(EncodableValue(devices_list)));
+}
+
+void CameraPlugin::AvailableDirectShowCamerasMethodHandler(
+  std::unique_ptr<flutter::MethodResult<>> result) {
+
+  std::vector<CameraInfo> cameras = ListDirectShowCameras();
+
+  flutter::EncodableList cameraList;
+  for (const auto& cam : cameras) {
+    std::string name = WideStringToUtf8(cam.name);
+
+    cameraList.push_back(flutter::EncodableMap{
+        {flutter::EncodableValue("name"), flutter::EncodableValue(name)},
+        {flutter::EncodableValue("lensFacing"), flutter::EncodableValue("external")},
+        {flutter::EncodableValue("sensorOrientation"), flutter::EncodableValue(0)},
+    });
+  }
+
+  result->Success(cameraList);
 }
 
 bool CameraPlugin::EnumerateVideoCaptureDeviceSources(IMFActivate*** devices,

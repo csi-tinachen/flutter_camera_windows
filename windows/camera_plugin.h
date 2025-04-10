@@ -72,6 +72,9 @@ class CameraPlugin : public flutter::Plugin,
   void AvailableCamerasMethodHandler(
       std::unique_ptr<flutter::MethodResult<>> result);
 
+  void AvailableDirectShowCamerasMethodHandler(
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+
   // Handles create method calls.
   // Creates camera and initializes capture controller for requested device.
   // Stores result object to be handled after request is processed.
