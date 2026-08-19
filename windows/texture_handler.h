@@ -69,7 +69,7 @@ class TextureHandler {
   }
 
   // Update current frame format.
-  void SetFrameFormat(std::string& format) { frame_foramt_ = format; }
+  void SetFrameFormat(std::string& format) { frame_format_ = format; }
 
   // Sets software mirror state.
   void SetMirrorPreviewState(bool mirror) { mirror_preview_ = mirror; }
@@ -105,9 +105,11 @@ class TextureHandler {
   uint32_t preview_frame_width_ = 0;
   uint32_t preview_frame_height_ = 0;
 
-  std::string frame_foramt_;
+  std::string frame_format_;
   std::string FRAME_FORMAT_RGB = "UVC-RGB";
   std::string FRAME_FORMAT_YUV = "UVC-YUV";
+  std::string FRAME_FORMAT_Y16 = "UVC-Y16";
+  std::string FRAME_FORMAT_NV12 = "UVC-NV12";
 
   std::vector<uint8_t> source_buffer_;
   std::vector<uint8_t> dest_buffer_;

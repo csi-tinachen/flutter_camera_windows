@@ -104,69 +104,91 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
     return nullptr;
   }
 
-  const uint32_t bytes_per_pixel = 4;
+  const uint32_t src_bytes_per_pixel = (frame_format_.compare(FRAME_FORMAT_Y16) == 0) ? 2 : 4;
   const uint32_t pixels_total = preview_frame_width_ * preview_frame_height_;
-  const uint32_t data_size = pixels_total * bytes_per_pixel;
-  if (data_size > 0 && source_buffer_.size() == data_size) {
-    if (dest_buffer_.size() != data_size) {
-      dest_buffer_.resize(data_size);
+  const uint32_t src_data_size = pixels_total * src_bytes_per_pixel;
+  const uint32_t dst_data_size = pixels_total * 4;
+  const uint32_t raw_data_size = (src_bytes_per_pixel == 2) ? src_data_size : dst_data_size;
+
+  if (src_data_size > 0 && source_buffer_.size() == src_data_size) {
+    if (dest_buffer_.size() != dst_data_size) {
+      dest_buffer_.resize(dst_data_size);
     }
-    if (raw_buffer_.size() != data_size) {
-      raw_buffer_.resize(data_size);
+    if (raw_buffer_.size() != raw_data_size) {
+      raw_buffer_.resize(raw_data_size);
     }
 
-    // Map buffers to structs for easier conversion.
-    MFVideoFormatRGB32Pixel* src =
-        reinterpret_cast<MFVideoFormatRGB32Pixel*>(source_buffer_.data());
-    FlutterDesktopPixel* dst =
-        reinterpret_cast<FlutterDesktopPixel*>(dest_buffer_.data());
-    FlutterDesktopPixel* raw =
-        reinterpret_cast<FlutterDesktopPixel*>(raw_buffer_.data());
+    FlutterDesktopPixel* dst = reinterpret_cast<FlutterDesktopPixel*>(dest_buffer_.data());
 
-    for (uint32_t y = 0; y < preview_frame_height_; y++) {
-      for (uint32_t x = 0; x < preview_frame_width_; x++) {
-        uint32_t sp = (y * preview_frame_width_) + x;
-        if (mirror_preview_) {
+    if (src_bytes_per_pixel == 2 && frame_format_.compare(FRAME_FORMAT_Y16) == 0) {
+      // UVC-Y16
+      uint16_t* src = reinterpret_cast<uint16_t*>(source_buffer_.data());
+      uint16_t* raw_y16 = reinterpret_cast<uint16_t*>(raw_buffer_.data());
+
+      // min-max normalization
+      uint16_t min_val = 65535;
+      uint16_t max_val = 0;
+      for (uint32_t i = 0; i < pixels_total; i++) {
+        if (src[i] < min_val) min_val = src[i];
+        if (src[i] > max_val) max_val = src[i];
+      }
+      float range = (max_val > min_val) ? static_cast<float>(max_val - min_val) : 1.0f;
+
+      for (uint32_t y = 0; y < preview_frame_height_; y++) {
+        for (uint32_t x = 0; x < preview_frame_width_; x++) {
+          // Software mirror mode.
+          // IMFCapturePreviewSink also has the SetMirrorState setting,
+          // but if enabled, samples will not be processed.
+
+          // Calculates mirrored pixel position.
+          uint32_t sp = (y * preview_frame_width_) + x;
+          uint32_t tp = mirror_preview_ ? ((y * preview_frame_width_) + ((preview_frame_width_ - 1) - x)) : sp;
+
+          // min-max normalization
+          uint8_t gray = static_cast<uint8_t>(((src[sp] - min_val) / range) * 255.0f);
+
+          // snapshot
+          raw_y16[tp] = src[sp];
+
+          // preview
+          dst[tp].r = gray;
+          dst[tp].g = gray;
+          dst[tp].b = gray;
+          dst[tp].a = 255;
+        }
+      }
+    } else {
+      // MFVideoFormat_RGB32
+      MFVideoFormatRGB32Pixel* src = reinterpret_cast<MFVideoFormatRGB32Pixel*>(source_buffer_.data());
+      FlutterDesktopPixel* raw = reinterpret_cast<FlutterDesktopPixel*>(raw_buffer_.data());
+      for (uint32_t y = 0; y < preview_frame_height_; y++) {
+        for (uint32_t x = 0; x < preview_frame_width_; x++) {
           // Software mirror mode.
           // IMFCapturePreviewSink also has the SetMirrorState setting,
           // but if enabled, samples will not be processed.
 
           // Calculates mirrored pixel position.
           // Check the frame format
-          uint32_t tp =
-              (y * preview_frame_width_) + ((preview_frame_width_ - 1) - x);
+          uint32_t sp = (y * preview_frame_width_) + x;
+          uint32_t tp = mirror_preview_ ? ((y * preview_frame_width_) + ((preview_frame_width_ - 1) - x)) : sp;
+
+          // snapshot
           raw[tp].r = src[sp].r;
           raw[tp].g = src[sp].g;
           raw[tp].b = src[sp].b;
           raw[tp].a = 255;
 
-          if (frame_foramt_.compare(FRAME_FORMAT_YUV) == 0) {
+          // preview
+          if (frame_format_.compare(FRAME_FORMAT_YUV) == 0 || frame_format_.compare(FRAME_FORMAT_NV12) == 0) {
             dst[tp].r = src[sp].r;
             dst[tp].g = src[sp].g;
             dst[tp].b = src[sp].b;
             dst[tp].a = 255;
-          } else if (frame_foramt_.compare(FRAME_FORMAT_RGB) == 0) {
+          } else if (frame_format_.compare(FRAME_FORMAT_RGB) == 0) {
             dst[tp].r = src[sp].b;
             dst[tp].g = src[sp].b;
             dst[tp].b = src[sp].b;
             dst[tp].a = 255;
-          }
-        } else {
-          // Check the frame format
-          raw[sp].r = src[sp].r;
-          raw[sp].g = src[sp].g;
-          raw[sp].b = src[sp].b;
-          raw[sp].a = 255;
-          if (frame_foramt_.compare(FRAME_FORMAT_YUV) == 0) {
-            dst[sp].r = src[sp].r;
-            dst[sp].g = src[sp].g;
-            dst[sp].b = src[sp].b;
-            dst[sp].a = 255;
-          } else if (frame_foramt_.compare(FRAME_FORMAT_RGB) == 0) {
-            dst[sp].r = src[sp].b;
-            dst[sp].g = src[sp].b;
-            dst[sp].b = src[sp].b;
-            dst[sp].a = 255;
           }
         }
       }
@@ -188,7 +210,7 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
     flutter_desktop_pixel_buffer_->width = preview_frame_width_;
     flutter_desktop_pixel_buffer_->height = preview_frame_height_;
     if (capture_controller_listener_) {
-      capture_controller_listener_->OnStreamedFrameAvailable(raw_buffer_.data(), preview_frame_width_ * preview_frame_height_ * 4);
+      capture_controller_listener_->OnStreamedFrameAvailable(raw_buffer_.data(), raw_data_size);
     }
     if (isRecording_) {
       WriteFrame(pSinkWriter_, stream, dest_buffer_.data(), rtStart);
