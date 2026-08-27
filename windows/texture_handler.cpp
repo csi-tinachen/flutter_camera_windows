@@ -104,11 +104,15 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
     return nullptr;
   }
 
-  const uint32_t src_bytes_per_pixel = (frame_format_.compare(FRAME_FORMAT_Y16) == 0) ? 2 : 4;
   const uint32_t pixels_total = preview_frame_width_ * preview_frame_height_;
-  const uint32_t src_data_size = pixels_total * src_bytes_per_pixel;
+  uint32_t src_data_size = pixels_total * 4;
+  if (frame_format_.compare(FRAME_FORMAT_Y16) == 0 || frame_format_.compare(FRAME_FORMAT_YUV) == 0) {
+    src_data_size = pixels_total * 2;
+  } else if (frame_format_.compare(FRAME_FORMAT_NV12) == 0) {
+    src_data_size = (pixels_total * 3) / 2;
+  }
   const uint32_t dst_data_size = pixels_total * 4;
-  const uint32_t raw_data_size = (src_bytes_per_pixel == 2) ? src_data_size : dst_data_size;
+  const uint32_t raw_data_size = (frame_format_.compare(FRAME_FORMAT_Y16) == 0) ? src_data_size : dst_data_size;
 
   if (src_data_size > 0 && source_buffer_.size() == src_data_size) {
     if (dest_buffer_.size() != dst_data_size) {
@@ -120,7 +124,21 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
 
     FlutterDesktopPixel* dst = reinterpret_cast<FlutterDesktopPixel*>(dest_buffer_.data());
 
-    if (src_bytes_per_pixel == 2 && frame_format_.compare(FRAME_FORMAT_Y16) == 0) {
+    auto clamp255 = [](int v) -> uint8_t {
+      return (uint8_t)((v < 0) ? 0 : ((v > 255) ? 255 : v));
+    };
+
+    auto YUV2RGB = [&clamp255](int Y, int U, int V, uint8_t& r, uint8_t& g, uint8_t& b) {
+      int c = Y;
+      int d = U - 128;
+      int e = V - 128;
+      // Full range BT.601 to RGB
+      r = clamp255(c + (int)(1.402f * e));
+      g = clamp255(c - (int)(0.344136f * d) - (int)(0.714136f * e));
+      b = clamp255(c + (int)(1.772f * d));
+    };
+
+    if (frame_format_.compare(FRAME_FORMAT_Y16) == 0) {
       // UVC-Y16
       uint16_t* src = reinterpret_cast<uint16_t*>(source_buffer_.data());
       uint16_t* raw_y16 = reinterpret_cast<uint16_t*>(raw_buffer_.data());
@@ -157,6 +175,58 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
           dst[tp].a = 255;
         }
       }
+    } else if (frame_format_.compare(FRAME_FORMAT_YUV) == 0) {
+      // UVC-YUV (YUY2 / YUYV)
+      uint8_t* src = reinterpret_cast<uint8_t*>(source_buffer_.data());
+      FlutterDesktopPixel* raw = reinterpret_cast<FlutterDesktopPixel*>(raw_buffer_.data());
+
+      for (uint32_t y = 0; y < preview_frame_height_; y++) {
+        for (uint32_t x = 0; x < preview_frame_width_; x += 2) {
+          uint32_t sp = (y * preview_frame_width_ + x) * 2; // byte offset
+          
+          uint8_t y0 = src[sp];
+          uint8_t u  = src[sp + 1];
+          uint8_t y1 = src[sp + 2];
+          uint8_t v  = src[sp + 3];
+
+          uint8_t r0, g0, b0, r1, g1, b1;
+          YUV2RGB(y0, u, v, r0, g0, b0);
+          YUV2RGB(y1, u, v, r1, g1, b1);
+          
+          uint32_t tp0 = mirror_preview_ ? (y * preview_frame_width_ + (preview_frame_width_ - 1 - x)) : (y * preview_frame_width_ + x);
+          uint32_t tp1 = mirror_preview_ ? (y * preview_frame_width_ + (preview_frame_width_ - 1 - (x + 1))) : (y * preview_frame_width_ + (x + 1));
+
+          dst[tp0].r = r0; dst[tp0].g = g0; dst[tp0].b = b0; dst[tp0].a = 255;
+          dst[tp1].r = r1; dst[tp1].g = g1; dst[tp1].b = b1; dst[tp1].a = 255;
+          raw[tp0] = dst[tp0];
+          raw[tp1] = dst[tp1];
+        }
+      }
+    } else if (frame_format_.compare(FRAME_FORMAT_NV12) == 0) {
+      // UVC-NV12
+      uint8_t* src_y = reinterpret_cast<uint8_t*>(source_buffer_.data());
+      uint8_t* src_uv = src_y + pixels_total;
+      FlutterDesktopPixel* raw = reinterpret_cast<FlutterDesktopPixel*>(raw_buffer_.data());
+
+      for (uint32_t y = 0; y < preview_frame_height_; y++) {
+        uint32_t uv_y = y / 2;
+        for (uint32_t x = 0; x < preview_frame_width_; x++) {
+          uint32_t y_idx = y * preview_frame_width_ + x;
+          uint32_t uv_idx = uv_y * preview_frame_width_ + (x & ~1); // x floor to even
+          
+          uint8_t Y = src_y[y_idx];
+          uint8_t U = src_uv[uv_idx];
+          uint8_t V = src_uv[uv_idx + 1];
+
+          uint8_t r, g, b;
+          YUV2RGB(Y, U, V, r, g, b);
+
+          uint32_t tp = mirror_preview_ ? (y * preview_frame_width_ + (preview_frame_width_ - 1 - x)) : y_idx;
+
+          dst[tp].r = r; dst[tp].g = g; dst[tp].b = b; dst[tp].a = 255;
+          raw[tp] = dst[tp];
+        }
+      }
     } else {
       // MFVideoFormat_RGB32
       MFVideoFormatRGB32Pixel* src = reinterpret_cast<MFVideoFormatRGB32Pixel*>(source_buffer_.data());
@@ -179,17 +249,10 @@ const FlutterDesktopPixelBuffer* TextureHandler::ConvertPixelBufferForFlutter(
           raw[tp].a = 255;
 
           // preview
-          if (frame_format_.compare(FRAME_FORMAT_YUV) == 0 || frame_format_.compare(FRAME_FORMAT_NV12) == 0) {
-            dst[tp].r = src[sp].r;
-            dst[tp].g = src[sp].g;
-            dst[tp].b = src[sp].b;
-            dst[tp].a = 255;
-          } else if (frame_format_.compare(FRAME_FORMAT_RGB) == 0) {
-            dst[tp].r = src[sp].b;
-            dst[tp].g = src[sp].b;
-            dst[tp].b = src[sp].b;
-            dst[tp].a = 255;
-          }
+          dst[tp].r = src[sp].b;
+          dst[tp].g = src[sp].b;
+          dst[tp].b = src[sp].b;
+          dst[tp].a = 255;
         }
       }
     }
@@ -401,7 +464,6 @@ HRESULT TextureHandler::StartRecording(const std::string& path) {
 
   return hr;
 }
-
 
 HRESULT TextureHandler::StopRecording() {
   HRESULT hr = S_OK;

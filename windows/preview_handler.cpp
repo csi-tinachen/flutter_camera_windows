@@ -33,12 +33,16 @@ HRESULT BuildMediaTypeForVideoPreview(IMFMediaType* src_media_type,
     return hr;
   }
 
-  // Changes subtype to MFVideoFormat_RGB32, unless source is Y16 (which MF doesn't natively convert to RGB32)
+  // Skip the color converter, to make the preview looks same as the preview of camera raw data.
   GUID src_subtype = {0};
   hr = src_media_type->GetGUID(MF_MT_SUBTYPE, &src_subtype);
   static const GUID MFVideoFormat_Y16_CUSTOM = {0x20363159, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
   if (src_subtype == MFVideoFormat_Y16_CUSTOM) {
     hr = new_media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_Y16_CUSTOM);
+  } else if (src_subtype == MFVideoFormat_YUY2) {
+    hr = new_media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_YUY2);
+  } else if (src_subtype == MFVideoFormat_NV12) {
+    hr = new_media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
   } else {
     hr = new_media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
   }
